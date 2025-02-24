@@ -67,7 +67,7 @@ app.get('/:email/:password', async (req, res) => {
         }
 
         // Bước 2: Kiểm tra hộp thư
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < 5; i++) {
             const emails = await getEmails(token);
             if (emails.length > 0) {
                 const latestEmail = emails[0];
