@@ -54,6 +54,15 @@ function extractVerificationCode(emailContent) {
     return match ? match[0] : null;
 }
 
+function randomString(length) {
+    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return result;
+}
+
 // API endpoint: /get-code?email=your@email.com&password=yourpassword
 app.get('/get-code', async (req, res) => {
     const email = req.query.email;
@@ -90,6 +99,47 @@ app.get('/get-code', async (req, res) => {
     } catch (error) {
         console.error('Lỗi:', error);
         return res.json({ code: "111111" }); // Trả về 111111 nếu có lỗi bất ngờ
+    }
+});
+
+app.get('/create-email', async (req, res) => {
+    try {
+        // Lấy danh sách domain từ Mail.tm
+        const domainResponse = await axios.get('https://api.mail.tm/domains');
+        const domains = domainResponse.data['hydra:member']; 
+        const randomDomain = domains[Math.floor(Math.random() * domains.length)].domain;
+
+        // Tạo email ngẫu nhiên
+        const emailPrefix = randomString(10);
+        const email = `${emailPrefix}@${randomDomain}`;
+
+        // Tạo mật khẩu ngẫu nhiên
+        const password = randomString(10);
+
+        // Gửi request để tạo tài khoản
+        const response = await axios.post('https://api.mail.tm/accounts', {
+            address: email,
+            password: password
+        }, {
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        });
+
+        // ✅ Dùng res.json() để trả về JSON cho client
+        res.json({
+            email: email,
+            password: password,
+            accountInfo: response.data
+        });
+
+    } catch (error) {
+        console.error("Lỗi tạo email:", error.response?.data || error.message);
+        res.status(500).json({
+            email: "error",
+            password: "error",
+            accountInfo: "error"
+        });
     }
 });
 
