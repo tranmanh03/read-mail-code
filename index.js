@@ -47,16 +47,22 @@ async function getEmailContent(token, emailId) {
     }
 }
 
-// Hàm trích xuất mã xác thực
+// Hàm trích xuất mã xác thực từ nội dung email
 function extractVerificationCode(emailContent) {
     const pattern = /\b\d{6}\b/;
     const match = emailContent.match(pattern);
     return match ? match[0] : null;
 }
 
-// API endpoint: /email/password
-app.get('/:email/:password', async (req, res) => {
-    const { email, password } = req.params;
+// API endpoint: /get-code?email=your@email.com&password=yourpassword
+app.get('/get-code', async (req, res) => {
+    const email = req.query.email;
+    const password = req.query.password;
+
+    if (!email || !password) {
+        return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
+    }
+
     console.log(`Yêu cầu từ: ${email}, password: ${password}`);
 
     try {
@@ -66,7 +72,7 @@ app.get('/:email/:password', async (req, res) => {
             return res.json({ code: "111111" }); // Trả về 111111 nếu không lấy được token
         }
 
-        // Bước 2: Kiểm tra hộp thư
+        // Bước 2: Kiểm tra hộp thư để lấy mã
         for (let i = 0; i < 5; i++) {
             const emails = await getEmails(token);
             if (emails.length > 0) {
@@ -74,13 +80,13 @@ app.get('/:email/:password', async (req, res) => {
                 const emailContent = await getEmailContent(token, latestEmail.id);
                 const code = extractVerificationCode(emailContent);
                 if (code) {
-                    return res.json({ code: code }); // Trả về mã thực nếu tìm thấy
+                    return res.json({ code: code });
                 }
             }
             console.log('Chưa tìm thấy mã, chờ 5 giây...');
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        return res.json({ code: "111111" }); // Trả về 111111 nếu không tìm thấy mã sau 10 lần
+        return res.json({ code: "111111" }); // Trả về 111111 nếu không tìm thấy mã sau 5 lần thử
     } catch (error) {
         console.error('Lỗi:', error);
         return res.json({ code: "111111" }); // Trả về 111111 nếu có lỗi bất ngờ

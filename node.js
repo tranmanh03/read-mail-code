@@ -51,15 +51,16 @@ async function getEmailContent(token, emailId) {
 function extractVerificationCode(emailContent) {
     const pattern = /\b\d{6}\b/; // Tìm mã 6 chữ số
     const match = emailContent.match(pattern);
-    if (match) {
-        return match[0];
-    }
-    return null;
+    return match ? match[0] : null;
 }
 
 // Hàm chính để lấy mã xác thực
 async function getVerificationCode(email, password) {
     console.log(`Sử dụng email: ${email}, password: ${password}`);
+
+    // Encode email và password để tránh lỗi ký tự đặc biệt
+    const encodedEmail = encodeURIComponent(email);
+    const encodedPassword = encodeURIComponent(password);
 
     // Bước 1: Lấy token xác thực
     const token = await getAuthToken(email, password);
@@ -68,7 +69,19 @@ async function getVerificationCode(email, password) {
         return null;
     }
 
-    // Bước 2: Kiểm tra hộp thư để lấy mã
+    // Bước 2: Gọi API với mật khẩu đã encode
+    const apiUrl = `https://read-mail-code.onrender.com/${encodedEmail}/${encodedPassword}`;
+    console.log('Gọi API:', apiUrl);
+
+    try {
+        const response = await axios.get(apiUrl);
+        console.log('Kết quả API:', response.data);
+    } catch (error) {
+        console.error('Lỗi khi gọi API:', error.response?.data || error.message);
+        return null;
+    }
+
+    // Bước 3: Kiểm tra hộp thư để lấy mã
     console.log('Đang kiểm tra hộp thư để tìm mã xác thực...');
     for (let i = 0; i < 10; i++) { // Thử tối đa 10 lần, mỗi lần cách 5 giây
         const emails = await getEmails(token);
@@ -76,11 +89,11 @@ async function getVerificationCode(email, password) {
             const latestEmail = emails[0]; // Lấy email mới nhất
             console.log(`Tìm thấy email từ: ${latestEmail.from.address}, chủ đề: ${latestEmail.subject}`);
             
-            // Bước 3: Lấy nội dung email
+            // Bước 4: Lấy nội dung email
             const emailContent = await getEmailContent(token, latestEmail.id);
             console.log('Nội dung email:', emailContent);
 
-            // Bước 4: Trích xuất mã xác thực
+            // Bước 5: Trích xuất mã xác thực
             const code = extractVerificationCode(emailContent);
             if (code) {
                 console.log(`Mã xác thực: ${code}`);
@@ -99,8 +112,8 @@ async function getVerificationCode(email, password) {
 }
 
 // Thông tin email và password của bạn
-const myEmail = '2bs828i2@tohru.org';
-const myPassword = 'mv5a63mn';
+const myEmail = 'chloriscrimson@indigobook.com';
+const myPassword = ']]I{1GR/HU'; // Mật khẩu có ký tự đặc biệt
 
 // Chạy chương trình
 getVerificationCode(myEmail, myPassword)
