@@ -54,15 +54,6 @@ function extractVerificationCode(emailContent) {
     return match ? match[0] : null;
 }
 
-function randomString(length) {
-    const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
-}
-
 // API endpoint: /get-code?email=your@email.com&password=yourpassword
 app.get('/get-code', async (req, res) => {
     const email = req.query.email;
@@ -102,39 +93,65 @@ app.get('/get-code', async (req, res) => {
     }
 });
 
+// ✅ Hàm tạo chuỗi ngẫu nhiên mạnh
+function randomString(length) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    return Array.from({ length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+}
+
+// ✅ Hàm tạo email với Mail.tm (retry tối đa 5 lần, delay 3s mỗi lần)
+async function createMailTM(retries = 5) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            // Bước 1: Lấy danh sách domain từ Mail.tm
+            const domainResponse = await axios.get('https://api.mail.tm/domains', { timeout: 3000 });
+            const domains = domainResponse.data['hydra:member'];
+            if (!domains.length) throw new Error("Không có domain nào khả dụng");
+
+            // Bước 2: Tạo email ngẫu nhiên
+            const email = `${randomString(12)}@${domains[Math.floor(Math.random() * domains.length)].domain}`;
+            const password = randomString(10);
+
+            // Bước 3: Tạo tài khoản trên Mail.tm
+            const response = await axios.post('https://api.mail.tm/accounts', {
+                address: email,
+                password: password
+            }, {
+                headers: { 'Content-Type': 'application/json' },
+                timeout: 5000
+            });
+
+            return { email, password, accountInfo: response.data };
+        } catch (error) {
+            console.error(`Lỗi khi tạo email (thử lần ${i + 1}):`, error.message);
+            if (i < retries - 1) await new Promise(res => setTimeout(res, 3000)); // Đợi 3 giây rồi thử lại
+        }
+    }
+    throw new Error("Tạo email thất bại sau nhiều lần thử");
+}
+
+// ✅ API tạo email
 app.get('/create-email', async (req, res) => {
     try {
-        // Lấy danh sách domain từ Mail.tm
-        const domainResponse = await axios.get('https://api.mail.tm/domains');
-        const domains = domainResponse.data['hydra:member']; 
-        const randomDomain = domains[Math.floor(Math.random() * domains.length)].domain;
-
-        // Tạo email ngẫu nhiên
-        const emailPrefix = randomString(10);
-        const email = `${emailPrefix}@${randomDomain}`;
-
-        // Tạo mật khẩu ngẫu nhiên
-        const password = randomString(10);
-
-        // Gửi request để tạo tài khoản
-        const response = await axios.post('https://api.mail.tm/accounts', {
-            address: email,
-            password: password
-        }, {
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        });
-
-        // ✅ Dùng res.json() để trả về JSON cho client
-        res.json({
-            email: email,
-            password: password,
-            accountInfo: response.data
-        });
-
+        const emailData = await createMailTM();
+        res.json(emailData);
     } catch (error) {
-        console.error("Lỗi tạo email:", error.response?.data || error.message);
+        console.error("Lỗi tạo email:", error.message);
+        res.status(500).json({
+            email: "error",
+            password: "error",
+            accountInfo: "error"
+        });
+    }
+});
+
+// ✅ API tạo email
+app.get('/create-email', async (req, res) => {
+    try {
+        const emailData = await createEmailWithRetry();
+        res.json(emailData);
+    } catch (error) {
+        console.error("Lỗi tạo email:", error.message);
         res.status(500).json({
             email: "error",
             password: "error",
