@@ -221,7 +221,7 @@ function extractVerificationCode(emailContent) {
 }
 
 // 🔹 API lấy mã từ mail.privateemail.com (IMAP)
-app.get('/get-code', async (req, res) => {
+app.get('/get-code2', async (req, res) => {
     const emailUser = decodeURIComponent(req.query.emailUser);
     const emailPass = decodeURIComponent(req.query.emailPass);
     const targetEmail = decodeURIComponent(req.query.targetEmail);
