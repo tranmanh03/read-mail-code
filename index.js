@@ -226,7 +226,7 @@ app.get('/:emailUser/:emailPass/:targetEmail', async (req, res) => {
     const emailPass = decodeURIComponent(req.params.emailPass);
     const targetEmail = decodeURIComponent(req.params.targetEmail);
 
-    console.log(`📩 Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
+    console.log(`Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
 
     try {
         const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
