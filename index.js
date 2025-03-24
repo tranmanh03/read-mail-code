@@ -147,21 +147,6 @@ app.get('/create-email', async (req, res) => {
     }
 });
 
-// ✅ API tạo email
-app.get('/create-email', async (req, res) => {
-    try {
-        const emailData = await createEmailWithRetry();
-        res.json(emailData);
-    } catch (error) {
-        console.error("Lỗi tạo email:", error.message);
-        res.status(500).json({
-            email: "error",
-            password: "error",
-            accountInfo: "error"
-        });
-    }
-});
-
 // 🔹 Hàm lấy mã từ mail.privateemail.com (IMAP)
 async function getCodeFromIMAP(emailUser, emailPass, targetEmail) {
     return new Promise((resolve, reject) => {
@@ -237,7 +222,11 @@ function extractVerificationCode(emailContent) {
 
 // 🔹 API lấy mã từ mail.privateemail.com (IMAP)
 app.get('/:emailUser/:emailPass/:targetEmail', async (req, res) => {
-    const { emailUser, emailPass, targetEmail } = req.params;
+    const emailUser = decodeURIComponent(req.params.emailUser);
+    const emailPass = decodeURIComponent(req.params.emailPass);
+    const targetEmail = decodeURIComponent(req.params.targetEmail);
+
+    console.log(`📩 Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
 
     try {
         const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
