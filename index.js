@@ -221,12 +221,16 @@ function extractVerificationCode(emailContent) {
 }
 
 // 🔹 API lấy mã từ mail.privateemail.com (IMAP)
-app.get('/:emailUser/:emailPass/:targetEmail', async (req, res) => {
-    const emailUser = decodeURIComponent(req.params.emailUser);
-    const emailPass = decodeURIComponent(req.params.emailPass);
-    const targetEmail = decodeURIComponent(req.params.targetEmail);
+app.get('/get-code', async (req, res) => {
+    const emailUser = decodeURIComponent(req.query.emailUser);
+    const emailPass = decodeURIComponent(req.query.emailPass);
+    const targetEmail = decodeURIComponent(req.query.targetEmail);
 
-    console.log(`Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
+    console.log(`📩 Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
+
+    if (!emailUser || !emailPass || !targetEmail) {
+        return res.status(400).json({ error: "Thiếu thông tin đăng nhập" });
+    }
 
     try {
         const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
