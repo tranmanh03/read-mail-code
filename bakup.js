@@ -88,7 +88,7 @@ async function getVerificationCode(email, password) {
         if (emails.length > 0) {
             const latestEmail = emails[0]; // Lấy email mới nhất
             console.log(`Tìm thấy email từ: ${latestEmail.from.address}, chủ đề: ${latestEmail.subject}`);
-            
+
             // Bước 4: Lấy nội dung email
             const emailContent = await getEmailContent(token, latestEmail.id);
             console.log('Nội dung email:', emailContent);

@@ -1,5 +1,8 @@
+require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
+const Imap = require('imap');
+const { simpleParser } = require('mailparser');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -157,6 +160,91 @@ app.get('/create-email', async (req, res) => {
             password: "error",
             accountInfo: "error"
         });
+    }
+});
+
+// 🔹 Hàm lấy mã từ mail.privateemail.com (IMAP)
+async function getCodeFromIMAP(targetEmail) {
+    return new Promise((resolve, reject) => {
+        if (!targetEmail || !targetEmail.includes('@')) {
+            return resolve({ code: 111111 }); // Trả về mã mặc định nếu email không hợp lệ
+        }
+
+        const imap = new Imap({
+            user: process.env.EMAIL_USER,
+            password: process.env.EMAIL_PASS,
+            host: 'mail.privateemail.com',
+            port: 993,
+            tls: true
+        });
+
+        imap.once('ready', () => {
+            imap.openBox('INBOX', false, (err, box) => {
+                if (err) {
+                    imap.end();
+                    return reject(err);
+                }
+
+                // ✅ Sửa cú pháp `search`
+                imap.search([['TO', targetEmail]], (err, results) => {
+                    if (err || !results || results.length === 0) {
+                        imap.end();
+                        return resolve({ code: 111111 });
+                    }
+
+                    const latestEmailId = results[results.length - 1];
+
+                    const fetchStream = imap.fetch(latestEmailId, { bodies: '' });
+
+                    fetchStream.on('message', (msg) => {
+                        let emailData = '';
+
+                        msg.on('body', (stream) => {
+                            stream.on('data', (chunk) => emailData += chunk.toString());
+
+                            stream.once('end', async () => {
+                                try {
+                                    const parsed = await simpleParser(emailData);
+                                    const body = parsed.text || '';
+                                    const code = extractVerificationCode(body);
+                                    resolve({ code: code || 111111 });
+                                } catch (error) {
+                                    resolve({ code: 111111 });
+                                }
+                            });
+                        });
+                    });
+
+                    fetchStream.on('end', () => imap.end());
+                });
+            });
+        });
+
+        imap.once('error', (err) => {
+            console.error('Lỗi IMAP:', err);
+            resolve({ code: 111111 });
+        });
+
+        imap.connect();
+    });
+}
+
+// 🔹 Hàm trích xuất mã xác thực từ nội dung email
+function extractVerificationCode(emailContent) {
+    const pattern = /\b\d{6}\b/;
+    const match = emailContent.match(pattern);
+    return match ? match[0] : null;
+}
+
+// 🔹 API lấy mã từ mail.privateemail.com (IMAP)
+app.get('/:email', async (req, res) => {
+    const email = req.params.email;
+    try {
+        const result = await getCodeFromIMAP(email);
+        res.json(result);
+    } catch (error) {
+        console.error('Lỗi:', error);
+        res.json({ code: 111111 });
     }
 });
 
