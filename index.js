@@ -1,4 +1,3 @@
-require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const Imap = require('imap');
@@ -164,15 +163,15 @@ app.get('/create-email', async (req, res) => {
 });
 
 // 🔹 Hàm lấy mã từ mail.privateemail.com (IMAP)
-async function getCodeFromIMAP(targetEmail) {
+async function getCodeFromIMAP(emailUser, emailPass, targetEmail) {
     return new Promise((resolve, reject) => {
-        if (!targetEmail || !targetEmail.includes('@')) {
-            return resolve({ code: 111111 }); // Trả về mã mặc định nếu email không hợp lệ
+        if (!emailUser || !emailPass || !targetEmail || !targetEmail.includes('@')) {
+            return resolve({ code: 111111 }); // Trả về mã mặc định nếu thông tin không hợp lệ
         }
 
         const imap = new Imap({
-            user: process.env.EMAIL_USER,
-            password: process.env.EMAIL_PASS,
+            user: emailUser,
+            password: emailPass,
             host: 'mail.privateemail.com',
             port: 993,
             tls: true
@@ -237,10 +236,11 @@ function extractVerificationCode(emailContent) {
 }
 
 // 🔹 API lấy mã từ mail.privateemail.com (IMAP)
-app.get('/:email', async (req, res) => {
-    const email = req.params.email;
+app.get('/:emailUser/:emailPass/:targetEmail', async (req, res) => {
+    const { emailUser, emailPass, targetEmail } = req.params;
+
     try {
-        const result = await getCodeFromIMAP(email);
+        const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
         res.json(result);
     } catch (error) {
         console.error('Lỗi:', error);
