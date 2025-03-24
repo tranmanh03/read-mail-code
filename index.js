@@ -221,25 +221,36 @@ function extractVerificationCode(emailContent) {
 }
 
 // 🔹 API lấy mã từ mail.privateemail.com (IMAP)
-app.get('/get-code2', async (req, res) => {
-    const emailUser = decodeURIComponent(req.query.emailUser);
-    const emailPass = decodeURIComponent(req.query.emailPass);
-    const targetEmail = decodeURIComponent(req.query.targetEmail);
+app.get('/get-private-code', async (req, res) => {
+    const emailUser = req.query.emailUser;
+    const emailPass = req.query.emailPass;
+    const targetEmail = req.query.targetEmail;
 
-    console.log(`📩 Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
+    console.log(`Nhận request: user=${emailUser}, pass=${emailPass}, target=${targetEmail}`);
 
     if (!emailUser || !emailPass || !targetEmail) {
         return res.status(400).json({ error: "Thiếu thông tin đăng nhập" });
     }
 
     try {
-        const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
-        res.json(result);
+        let code = null;
+        for (let i = 0; i < 3; i++) {
+            const result = await getCodeFromIMAP(emailUser, emailPass, targetEmail);
+            if (result.code !== 111111) {
+                code = result.code;
+                break;
+            }
+            console.log(`Lần thử ${i + 1}: Không tìm thấy mã, chờ 5 giây...`);
+            await new Promise(resolve => setTimeout(resolve, 5000));
+        }
+
+        res.json({ code: code || 111111 });
     } catch (error) {
         console.error('Lỗi:', error);
         res.json({ code: 111111 });
     }
 });
+
 
 // Khởi động server
 app.listen(PORT, () => {
