@@ -6,46 +6,41 @@ const { simpleParser } = require('mailparser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// 🟢 Hàm lấy token xác thực từ mail.tm
+// Hàm lấy token xác thực từ mail.tm
 async function getAuthToken(email, password) {
-    const url = 'https://api.mail.tm/token';
     try {
-        const response = await axios.post(url, { address: email, password }, {
+        const response = await axios.post('https://api.mail.tm/token', { address: email, password }, {
             headers: { 'Content-Type': 'application/json' }
         });
         return response.data.token;
     } catch (error) {
-        console.error('❌ Lỗi khi lấy token:', error.response?.data || error.message);
+        console.error('Lỗi khi lấy token:', error.response?.data || error.message);
         return null;
     }
 }
 
-// 🟢 Hàm lấy danh sách email từ hộp thư
+// Hàm lấy danh sách email từ hộp thư
 async function getEmails(token) {
-    const url = 'https://api.mail.tm/messages';
     try {
-        const response = await axios.get(url, {
+        const response = await axios.get('https://api.mail.tm/messages', {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        console.log('📩 Danh sách email nhận được:', JSON.stringify(response.data['hydra:member'], null, 2));
         return response.data['hydra:member'];
     } catch (error) {
-        console.error('❌ Lỗi khi lấy danh sách email:', error.response?.data || error.message);
+        console.error('Lỗi khi lấy danh sách email:', error.response?.data || error.message);
         return [];
     }
 }
 
 // 🟢 Hàm lấy nội dung email chi tiết
 async function getEmailContent(token, emailId) {
-    const url = `https://api.mail.tm/messages/${emailId}`;
     try {
-        const response = await axios.get(url, {
+        const response = await axios.get(`https://api.mail.tm/messages/${emailId}`, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
-        console.log(`📜 Nội dung email (${emailId}):`, response.data.text || response.data.html || '');
         return response.data.text || response.data.html || '';
     } catch (error) {
-        console.error('❌ Lỗi khi lấy nội dung email:', error.response?.data || error.message);
+        console.error('Lỗi khi lấy nội dung email:', error.response?.data || error.message);
         return '';
     }
 }
@@ -54,7 +49,6 @@ async function getEmailContent(token, emailId) {
 function extractVerificationCode(emailContent) {
     const pattern = /\b\d{6}\b/g; // Tìm tất cả mã số 6 chữ số trong email
     const matches = emailContent.match(pattern);
-    console.log('🔍 Các mã tìm được:', matches);
     return matches ? matches[0] : null;
 }
 
@@ -67,16 +61,14 @@ app.get('/get-code', async (req, res) => {
         return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
     }
 
-    console.log(`📢 Nhận yêu cầu từ: ${email}, password: ${password}`);
+    console.log(`Nhận yêu cầu từ: ${email}`);
 
     try {
-        // 1️⃣ Lấy token
+        // 1️Lấy token
         const token = await getAuthToken(email, password);
-        if (!token) {
-            return res.json({ code: "111111" }); // Trả về mã mặc định nếu không lấy được token
-        }
+        if (!token) return res.json({ code: "111111" });
 
-        // 2️⃣ Kiểm tra hộp thư để lấy mã (Thử lại tối đa 3 lần)
+        // 2️Kiểm tra hộp thư để lấy mã (Thử lại tối đa 3 lần)
         const allowedSenders = ["verify@x.com", "info@x.com"]; // Danh sách người gửi hợp lệ
         for (let i = 0; i < 3; i++) {
             const emails = await getEmails(token);
@@ -92,16 +84,17 @@ app.get('/get-code', async (req, res) => {
                 }
             }
 
-            console.log(`⏳ Chưa tìm thấy mã, chờ 5 giây... (Lần ${i + 1}/3)`);
+            // Chờ 5 giây trước khi thử lại
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
 
-        return res.json({ code: "111111" }); // Trả về mã mặc định nếu không tìm thấy mã sau 3 lần thử
+        return res.json({ code: "111111" });
     } catch (error) {
-        console.error('❌ Lỗi:', error);
+        console.error('Lỗi:', error);
         return res.json({ code: "111111" });
     }
 });
+
 
 // ✅ Hàm tạo chuỗi ngẫu nhiên mạnh
 function randomString(length) {
