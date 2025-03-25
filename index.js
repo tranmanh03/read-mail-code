@@ -6,57 +6,59 @@ const { simpleParser } = require('mailparser');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Hàm lấy token xác thực từ mail.tm
+// 🟢 Hàm lấy token xác thực từ mail.tm
 async function getAuthToken(email, password) {
     const url = 'https://api.mail.tm/token';
-    const payload = { address: email, password };
     try {
-        const response = await axios.post(url, payload, {
+        const response = await axios.post(url, { address: email, password }, {
             headers: { 'Content-Type': 'application/json' }
         });
         return response.data.token;
     } catch (error) {
-        console.error('Lỗi khi lấy token:', error.response?.data || error.message);
-        return null; // Trả về null nếu lỗi
+        console.error('❌ Lỗi khi lấy token:', error.response?.data || error.message);
+        return null;
     }
 }
 
-// Hàm lấy danh sách email từ hộp thư
+// 🟢 Hàm lấy danh sách email từ hộp thư
 async function getEmails(token) {
     const url = 'https://api.mail.tm/messages';
     try {
         const response = await axios.get(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        console.log('📩 Danh sách email nhận được:', JSON.stringify(response.data['hydra:member'], null, 2));
         return response.data['hydra:member'];
     } catch (error) {
-        console.error('Lỗi khi lấy danh sách email:', error.response?.data || error.message);
+        console.error('❌ Lỗi khi lấy danh sách email:', error.response?.data || error.message);
         return [];
     }
 }
 
-// Hàm lấy nội dung email chi tiết
+// 🟢 Hàm lấy nội dung email chi tiết
 async function getEmailContent(token, emailId) {
     const url = `https://api.mail.tm/messages/${emailId}`;
     try {
         const response = await axios.get(url, {
             headers: { 'Authorization': `Bearer ${token}` }
         });
+        console.log(`📜 Nội dung email (${emailId}):`, response.data.text || response.data.html || '');
         return response.data.text || response.data.html || '';
     } catch (error) {
-        console.error('Lỗi khi lấy nội dung email:', error.response?.data || error.message);
+        console.error('❌ Lỗi khi lấy nội dung email:', error.response?.data || error.message);
         return '';
     }
 }
 
-// Hàm trích xuất mã xác thực từ nội dung email
+// 🟢 Hàm trích xuất mã xác thực từ nội dung email
 function extractVerificationCode(emailContent) {
-    const pattern = /\b\d{6}\b/;
-    const match = emailContent.match(pattern);
-    return match ? match[0] : null;
+    const pattern = /\b\d{6}\b/g; // Tìm tất cả mã số 6 chữ số trong email
+    const matches = emailContent.match(pattern);
+    console.log('🔍 Các mã tìm được:', matches);
+    return matches ? matches[0] : null;
 }
 
-// API endpoint: /get-code?email=your@email.com&password=yourpassword
+// 🟢 API lấy mã xác thực từ mail.tm
 app.get('/get-code', async (req, res) => {
     const email = req.query.email;
     const password = req.query.password;
@@ -65,39 +67,45 @@ app.get('/get-code', async (req, res) => {
         return res.status(400).json({ error: "Thiếu email hoặc mật khẩu" });
     }
 
-    console.log(`Yêu cầu từ: ${email}, password: ${password}`);
+    console.log(`📢 Nhận yêu cầu từ: ${email}, password: ${password}`);
 
     try {
-        // Bước 1: Lấy token
+        // 1️⃣ Lấy token
         const token = await getAuthToken(email, password);
         if (!token) {
-            return res.json({ code: "111111" }); // Trả về 111111 nếu không lấy được token
+            return res.json({ code: "111111" }); // Trả về mã mặc định nếu không lấy được token
         }
 
-        // Bước 2: Kiểm tra hộp thư để lấy mã
-        for (let i = 0; i < 5; i++) {
+        // 2️⃣ Kiểm tra hộp thư để lấy mã (Thử lại tối đa 3 lần)
+        const allowedSenders = ["verify@x.com", "info@x.com"]; // Danh sách người gửi hợp lệ
+        for (let i = 0; i < 3; i++) {
             const emails = await getEmails(token);
-            if (emails.length > 0) {
-                const latestEmail = emails[0];
+            const filteredEmails = emails.filter(email => allowedSenders.includes(email.from.address));
+
+            if (filteredEmails.length > 0) {
+                const latestEmail = filteredEmails[0]; // Email mới nhất từ người gửi hợp lệ
                 const emailContent = await getEmailContent(token, latestEmail.id);
                 const code = extractVerificationCode(emailContent);
+
                 if (code) {
-                    return res.json({ code: code });
+                    return res.json({ code });
                 }
             }
-            console.log('Chưa tìm thấy mã, chờ 5 giây...');
+
+            console.log(`⏳ Chưa tìm thấy mã, chờ 5 giây... (Lần ${i + 1}/3)`);
             await new Promise(resolve => setTimeout(resolve, 5000));
         }
-        return res.json({ code: "111111" }); // Trả về 111111 nếu không tìm thấy mã sau 5 lần thử
+
+        return res.json({ code: "111111" }); // Trả về mã mặc định nếu không tìm thấy mã sau 3 lần thử
     } catch (error) {
-        console.error('Lỗi:', error);
-        return res.json({ code: "111111" }); // Trả về 111111 nếu có lỗi bất ngờ
+        console.error('❌ Lỗi:', error);
+        return res.json({ code: "111111" });
     }
 });
 
 // ✅ Hàm tạo chuỗi ngẫu nhiên mạnh
 function randomString(length) {
-    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const chars = 'abcde32fghijklmno34pq5rfahot0wtq489perqtyqpqhj4vlam8xnbnzbvbhdyqrstuvwxyz0123456789';
     return Array.from({ length }, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
 }
 
@@ -111,8 +119,8 @@ async function createMailTM(retries = 5) {
             if (!domains.length) throw new Error("Không có domain nào khả dụng");
 
             // Bước 2: Tạo email ngẫu nhiên
-            const email = `${randomString(12)}@${domains[Math.floor(Math.random() * domains.length)].domain}`;
-            const password = randomString(10);
+            const email = `${randomString(10)}@${domains[Math.floor(Math.random() * domains.length)].domain}`;
+            const password = randomString(8);
 
             // Bước 3: Tạo tài khoản trên Mail.tm
             const response = await axios.post('https://api.mail.tm/accounts', {
